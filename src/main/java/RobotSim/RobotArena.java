@@ -1,13 +1,13 @@
 package RobotSim;
 
-import RobotSim.Line;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import java.util.ArrayList;
 
 /**
  * The RobotArena class manages the items (robots and obstacles) in the arena and their interactions.
- * It provides methods to add new items, render them, and handle their movement and collisions.
+ * It provides methods to add new items, render them, handle their movement and collisions,
+ * and manage the selection of items.
  */
 public class RobotArena {
 
@@ -15,7 +15,15 @@ public class RobotArena {
     private double width;
     private double height;
     private ArenaItem selectedItem;
+    private ArenaItem hoveredItem; // Added for hover handling
 
+    /**
+     * Constructs a new RobotArena with specified dimensions.
+     *
+     * @param width  The width of the arena.
+     * @param height The height of the arena.
+     * @throws IllegalArgumentException if width or height is non-positive.
+     */
     public RobotArena(double width, double height) {
         if (width <= 0 || height <= 0) {
             throw new IllegalArgumentException("Arena dimensions must be positive.");
@@ -25,12 +33,31 @@ public class RobotArena {
         items = new ArrayList<>();
     }
 
-    /** Clears all items (e.g., for "New Arena"). */
+    /**
+     * Updates the simulation speed by setting the speed of all robots.
+     *
+     * @param speed The speed multiplier to set.
+     */
+    public void updateSimulationSpeed(double speed) {
+        for (ArenaItem item : items) {
+            if (item instanceof Robot robot) {
+                robot.setSpeed(speed); // Set speed directly instead of multiplying
+            }
+        }
+    }
+
+    /**
+     * Clears all items from the arena, resetting it to an empty state.
+     */
     public void clearArena() {
         items.clear();
         selectedItem = null;
+        hoveredItem = null; // Clear hovered item as well
     }
 
+    /**
+     * Adds a new basic Robot at a random non-overlapping position.
+     */
     public void addRobot() {
         double x, y;
         do {
@@ -40,6 +67,9 @@ public class RobotArena {
         items.add(new Robot(x, y, 20));
     }
 
+    /**
+     * Adds a new ChaserRobot at a random non-overlapping position.
+     */
     public void addChaserRobot() {
         double x, y;
         do {
@@ -47,6 +77,18 @@ public class RobotArena {
             y = Math.random() * height;
         } while (isOverlapping(x, y, 20));
         items.add(new ChaserRobot(x, y, 20));
+    }
+
+    /**
+     * Adds a new BumpRobot at a random non-overlapping position.
+     */
+    public void addBumpRobot() {
+        double x, y;
+        do {
+            x = Math.random() * width;
+            y = Math.random() * height;
+        } while (isOverlapping(x, y, 20));
+        items.add(new BumpRobot(x, y, 20));
     }
 
     /**
@@ -61,6 +103,9 @@ public class RobotArena {
         items.add(new BeamRobot(x, y, 20));
     }
 
+    /**
+     * Adds a new Obstacle at a random non-overlapping position.
+     */
     public void addObstacle() {
         double x, y;
         do {
@@ -71,7 +116,7 @@ public class RobotArena {
     }
 
     /**
-     * Moves all Robot-derived items in the arena by calling their move() methods.
+     * Moves all Robot-derived items in the arena by invoking their move() methods.
      */
     public void moveRobots() {
         for (ArenaItem item : items) {
@@ -82,16 +127,16 @@ public class RobotArena {
     }
 
     /**
-     * Finds an arena item that covers the given (x, y) position (e.g., for mouse clicks).
-     * Returns the topmost item if multiple overlap. Otherwise returns null if none found.
+     * Finds and returns the topmost ArenaItem at the specified (x, y) coordinates.
+     *
+     * @param x The x-coordinate to search.
+     * @param y The y-coordinate to search.
+     * @return The ArenaItem at the specified location, or null if none found.
      */
     public ArenaItem findItemAt(double x, double y) {
-        // We'll check from front to back, so the last item in the list
-        // is considered "on top."
         for (int i = items.size() - 1; i >= 0; i--) {
             ArenaItem item = items.get(i);
             double dist = Math.sqrt(Math.pow(x - item.getX(), 2) + Math.pow(y - item.getY(), 2));
-            // If the click is within the radius of the item
             if (dist <= item.getRadius()) {
                 return item;
             }
@@ -101,11 +146,16 @@ public class RobotArena {
 
     /**
      * Checks if placing a new item at (x, y) with radius 'radius' would overlap existing items.
+     *
+     * @param x      The x-coordinate of the new position.
+     * @param y      The y-coordinate of the new position.
+     * @param radius The radius of the item being placed.
+     * @return True if overlapping occurs, false otherwise.
      */
     private boolean isOverlapping(double x, double y, double radius) {
-        Robot tempRobot = new Robot(x, y, radius);
+        ArenaItem tempItem = new Robot(x, y, radius); // Using Robot as a generic ArenaItem for overlap checking
         for (ArenaItem item : items) {
-            if (isColliding(tempRobot, item)) {
+            if (isColliding(tempItem, item)) {
                 return true;
             }
         }
@@ -114,6 +164,10 @@ public class RobotArena {
 
     /**
      * Determines whether two ArenaItems are colliding based on their distances.
+     *
+     * @param a The first ArenaItem.
+     * @param b The second ArenaItem.
+     * @return True if the two items' bounding circles intersect, false otherwise.
      */
     private boolean isColliding(ArenaItem a, ArenaItem b) {
         double distance = a.calculateDistance(b);
@@ -121,8 +175,39 @@ public class RobotArena {
     }
 
     /**
-     * Legacy method: checks if any obstacle is within the combined radius of the robot's sensor.
-     * (Used by Robot's simpler "radius-based" detection.)
+     * Checks if placing an item at (x, y) with radius 'radius' would cause a collision
+     * with existing items, excluding the item with the specified robotId.
+     *
+     * @param x        The x-coordinate of the new position.
+     * @param y        The y-coordinate of the new position.
+     * @param radius   The radius of the item being placed.
+     * @param robotId  The unique identifier of the item being moved (to exclude from collision check).
+     * @return True if a collision would occur, false otherwise.
+     */
+    public boolean isColliding(double x, double y, double radius, int robotId) {
+        for (ArenaItem item : items) {
+            // If the item is the same robot, skip
+            if (item instanceof Robot r) {
+                if (r.getId() == robotId) {
+                    continue;
+                }
+            }
+            double dx = x - item.getX();
+            double dy = y - item.getY();
+            double distSq = dx * dx + dy * dy;
+            double combinedRadius = radius + item.getRadius();
+            if (distSq < combinedRadius * combinedRadius) {
+                return true; // Collision detected
+            }
+        }
+        return false; // No collision
+    }
+
+    /**
+     * Checks if any obstacle is within the combined radius of the robot's sensor.
+     *
+     * @param robot The Robot to check against obstacles.
+     * @return True if an obstacle is nearby, false otherwise.
      */
     public boolean isObstacleNearby(Robot robot) {
         for (ArenaItem item : items) {
@@ -138,6 +223,8 @@ public class RobotArena {
 
     /**
      * Renders all items onto the given GraphicsContext.
+     *
+     * @param gc The GraphicsContext to draw on.
      */
     public void drawItems(GraphicsContext gc) {
         // First draw all unselected items
@@ -149,7 +236,6 @@ public class RobotArena {
 
         // Draw selected item last with highlight
         if (selectedItem != null) {
-            // Draw selection highlight
             gc.setStroke(Color.YELLOW);
             gc.setLineWidth(2);
             gc.strokeOval(
@@ -158,15 +244,53 @@ public class RobotArena {
                     (selectedItem.getRadius() + 5) * 2,
                     (selectedItem.getRadius() + 5) * 2
             );
-
-            // Draw the selected item
             selectedItem.draw(gc);
         }
     }
 
     /**
+     * Draws the arena, including the grid and all items.
+     *
+     * @param gc The GraphicsContext to draw on.
+     */
+    public void drawArena(GraphicsContext gc) {
+        // Clear and draw grid
+        gc.clearRect(0, 0, width, height);
+        drawGrid(gc);
+
+        // Draw all items
+        drawItems(gc);
+    }
+
+    /**
+     * Draws a grid on the arena for better visualization.
+     *
+     * @param gc The GraphicsContext of the arena.
+     */
+    private void drawGrid(GraphicsContext gc) {
+        // Draw grid lines
+        gc.setStroke(Color.LIGHTGRAY);
+        gc.setLineWidth(0.5);
+        double spacing = 20;
+
+        for (double x = 0; x <= width; x += spacing) {
+            gc.strokeLine(x, 0, x, height);
+        }
+
+        for (double y = 0; y <= height; y += spacing) {
+            gc.strokeLine(0, y, width, y);
+        }
+
+        // Draw border
+        gc.setStroke(Color.DARKGRAY);
+        gc.setLineWidth(2);
+        gc.strokeRect(0, 0, width, height);
+    }
+
+    /**
      * Serializes the arena dimensions and each ArenaItem to a String.
-     * Used for saving to a file.
+     *
+     * @return A String representing the serialized state of the arena.
      */
     public String saveArenaState() {
         StringBuilder sb = new StringBuilder();
@@ -182,7 +306,8 @@ public class RobotArena {
 
     /**
      * Deserializes the arena dimensions and items from a String.
-     * Used for loading from a file.
+     *
+     * @param data The serialized state of the arena.
      */
     public void loadArenaState(String data) {
         if (data == null || data.isBlank()) {
@@ -191,6 +316,7 @@ public class RobotArena {
         }
         items.clear();
         selectedItem = null; // Reset selection
+        hoveredItem = null;  // Reset hovered item
         String[] lines = data.split("\n");
 
         String[] dimensions = lines[0].split(" ");
@@ -218,13 +344,17 @@ public class RobotArena {
                 case "ChaserRobot" -> items.add(new ChaserRobot(x, y, radius));
                 case "BeamRobot"   -> items.add(new BeamRobot(x, y, radius));
                 case "Obstacle"    -> items.add(new Obstacle(x, y, radius));
+                case "BumpRobot"   -> items.add(new BumpRobot(x, y, radius));
+                case "SmartRobot"  -> items.add(new SmartRobot(x, y, radius));
                 default            -> System.err.println("Unknown item type: " + type);
             }
         }
     }
 
     /**
-     * Returns a status string listing all items by class name and (x, y).
+     * Provides a status string listing all items by class name and (x, y) coordinates.
+     *
+     * @return A String representing the current status of the arena.
      */
     public String getStatus() {
         StringBuilder status = new StringBuilder();
@@ -238,7 +368,7 @@ public class RobotArena {
     }
 
     /**
-     * Delete the currently selected item (if any).
+     * Deletes the currently selected item from the arena, if any.
      */
     public void deleteSelectedItem() {
         if (selectedItem != null) {
@@ -248,16 +378,30 @@ public class RobotArena {
     }
 
     /**
+     * Deletes a specific ArenaItem from the arena.
+     *
+     * @param item The ArenaItem to be deleted.
+     */
+    public void deleteItem(ArenaItem item) {
+        if (items.contains(item)) {
+            items.remove(item);
+            if (item.equals(selectedItem)) {
+                selectedItem = null;
+            }
+        }
+    }
+
+    /**
      * Checks if the provided line intersects ANY obstacle in the arena.
      *
-     * @param line A line to test (e.g. a "whisker" from a robot).
-     * @return true if line intersects any obstacle, false if it does not.
+     * @param line A line to test (e.g., a "whisker" from a robot).
+     * @return True if the line intersects any obstacle, false otherwise.
      */
     public boolean intersectsAnyObstacle(Line line) {
         for (ArenaItem item : items) {
             if (item instanceof Obstacle obstacle) {
                 if (intersectsSquare(line, obstacle)) {
-                    return true;  // as soon as we find one, we can return true
+                    return true;
                 }
             }
         }
@@ -266,52 +410,108 @@ public class RobotArena {
 
     /**
      * Helper method to determine if a line intersects a square Obstacle.
-     * @param line      The line to test
-     * @param obstacle  The square obstacle (center (ox, oy), side length = 2*radius)
-     * @return true if intersection is found
+     *
+     * @param line     The line to test for intersection.
+     * @param obstacle The Obstacle to check against.
+     * @return True if the line intersects the obstacle, false otherwise.
      */
     private boolean intersectsSquare(Line line, Obstacle obstacle) {
         double ox = obstacle.getX();
         double oy = obstacle.getY();
         double r  = obstacle.getRadius();
 
-        // Square edges, if obstacle is drawn from (ox-r, oy-r) to (ox+r, oy+r).
         double left   = ox - r;
         double right  = ox + r;
         double top    = oy - r;
         double bottom = oy + r;
 
-        // Build lines for each edge
         Line topEdge    = new Line(left,  top,    right,  top);
         Line bottomEdge = new Line(left,  bottom, right,  bottom);
         Line leftEdge   = new Line(left,  top,    left,   bottom);
         Line rightEdge  = new Line(right, top,    right,  bottom);
 
-        // If the line intersects any edge, we say it intersects the obstacle
-        return  line.findintersection(topEdge)    ||
-                line.findintersection(bottomEdge) ||
-                line.findintersection(leftEdge)   ||
-                line.findintersection(rightEdge);
+        return  line.findintersection(topEdge)
+                || line.findintersection(bottomEdge)
+                || line.findintersection(leftEdge)
+                || line.findintersection(rightEdge);
     }
 
-    // Getters and setters
+    // -------------------------------------------------------------------------
+    // Getters and Setters
+    // -------------------------------------------------------------------------
+
+    /**
+     * Retrieves the list of all ArenaItems in the arena.
+     *
+     * @return An ArrayList of ArenaItems.
+     */
     public ArrayList<ArenaItem> getItems() {
         return items;
     }
 
+    /**
+     * Retrieves the currently selected ArenaItem.
+     *
+     * @return The selected ArenaItem, or null if none is selected.
+     */
     public ArenaItem getSelectedItem() {
         return selectedItem;
     }
 
+    /**
+     * Sets the currently selected ArenaItem.
+     *
+     * @param item The ArenaItem to select, or null to clear selection.
+     */
     public void setSelectedItem(ArenaItem item) {
         this.selectedItem = item;
     }
 
+    /**
+     * Retrieves the currently hovered ArenaItem.
+     *
+     * @return The hovered ArenaItem, or null if none is hovered.
+     */
+    public ArenaItem getHoveredItem() {
+        return hoveredItem;
+    }
+
+    /**
+     * Sets the currently hovered ArenaItem.
+     *
+     * @param item The ArenaItem to set as hovered, or null to clear hover.
+     */
+    public void setHoveredItem(ArenaItem item) {
+        this.hoveredItem = item;
+    }
+
+    /**
+     * Retrieves the width of the arena.
+     *
+     * @return The width of the arena.
+     */
     public double getWidth() {
         return width;
     }
 
+    /**
+     * Retrieves the height of the arena.
+     *
+     * @return The height of the arena.
+     */
     public double getHeight() {
         return height;
+    }
+
+    /**
+     * Provides information about the selected item as a String.
+     *
+     * @return A String containing details of the selected item, or "None" if no item is selected.
+     */
+    public String getSelectedItemInfo() {
+        if (selectedItem != null) {
+            return selectedItem.toString();
+        }
+        return "None";
     }
 }
