@@ -1,12 +1,16 @@
 package RobotSim;
 
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.RadialGradient;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.Stop;
 
 /**
  * The Robot class represents a mobile robot within the RobotArena.
- * It includes a "whisker" line sensor to detect obstacles,
- * a translucent sensor range circle ("beam"), and two small black "wheels" (or treads).
+ * It includes enhanced visualization features such as improved wheels, sensors,
+ * metallic effects, direction indicators, and selection highlights.
  * The robot can move autonomously, detect collisions, and respond to user interactions.
  */
 public class Robot extends ArenaItem {
@@ -18,6 +22,9 @@ public class Robot extends ArenaItem {
 
     // Whisker (line-based sensor) properties
     private double whiskerLength = 40;     // Length of the whisker line
+
+    // Selection state
+    private boolean isSelected = false;    // Indicates if the robot is selected
 
     /**
      * Constructs a Robot with a specified position and radius.
@@ -31,86 +38,147 @@ public class Robot extends ArenaItem {
     }
 
     /**
-     * Draws the robot on the given GraphicsContext.
+     * Draws the robot on the given GraphicsContext with enhanced visualization.
      * The robot is rendered as:
-     * 1. A blue circle representing the body.
-     * 2. Two small black circles representing wheels.
-     * 3. A translucent light blue circle indicating sensor range.
-     * 4. A black line ("whisker") indicating the sensor direction.
+     * 1. A blue circle with a metallic effect representing the body.
+     * 2. Wheels with detailed treads.
+     * 3. Enhanced sensors including sensor range and whiskers.
+     * 4. A direction indicator.
+     * 5. A selection highlight if the robot is selected.
      *
      * @param gc The GraphicsContext used for drawing.
      */
     @Override
     public void draw(GraphicsContext gc) {
-        // 1) Draw the robot body (blue circle)
-        gc.setFill(Color.BLUE);
+        // Draw robot body with metallic effect
+        gc.setFill(Color.web("#3498db"));
         gc.fillOval(x - radius, y - radius, radius * 2, radius * 2);
 
-        // 2) Draw two "wheels" on the left and right sides
-        gc.setFill(Color.BLACK);
-        double wheelRadius = radius * 0.3; // Adjust as needed for bigger/smaller wheels
-
-        // Left wheel (around left edge of the robot body)
-        gc.fillOval(
-                (x - radius) - wheelRadius,
-                y - wheelRadius,
-                wheelRadius * 2,
-                wheelRadius * 2
+        // Draw metallic gradient overlay
+        RadialGradient gradient = new RadialGradient(
+                0, 0, x, y, radius,
+                false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.WHITE.deriveColor(0, 1, 1, 0.3)),
+                new Stop(1, Color.TRANSPARENT)
         );
+        gc.setFill(gradient);
+        gc.fillOval(x - radius, y - radius, radius * 2, radius * 2);
 
-        // Right wheel (around right edge of the robot body)
-        gc.fillOval(
-                (x + radius) - wheelRadius,
-                y - wheelRadius,
-                wheelRadius * 2,
-                wheelRadius * 2
-        );
+        // Draw wheels
+        drawWheels(gc);
 
-        // 3) Draw the sensor range circle (translucent light blue)
-        gc.setFill(Color.LIGHTBLUE);
-        gc.setGlobalAlpha(0.3);
-        gc.fillOval(x - sensorRange, y - sensorRange, sensorRange * 2, sensorRange * 2);
-        gc.setGlobalAlpha(1.0); // Reset alpha
+        // Draw enhanced sensors
+        drawEnhancedSensors(gc);
 
-        // 4) Draw the whisker line (black line indicating sensor direction)
-        gc.setStroke(Color.BLACK);
-        gc.setLineWidth(2);
-        double radians = Math.toRadians(direction);
-        double whiskerEndX = x + whiskerLength * Math.cos(radians);
-        double whiskerEndY = y + whiskerLength * Math.sin(radians);
-        gc.strokeLine(x, y, whiskerEndX, whiskerEndY);
+        // Draw direction indicator
+        drawDirectionIndicator(gc);
+
+        // Draw selection highlight if selected
+        if (isSelected) {
+            drawSelectionEffect(gc);
+        }
     }
 
     /**
-     * Draws additional wheels or treads. Subclasses can utilize this method
-     * to render their specific wheel designs.
+     * Draws wheels with detailed treads and rotation based on direction.
+     * Renamed to 'drawWheels' and made protected so it can be accessed by child classes.
      *
      * @param gc The GraphicsContext used for drawing.
      */
     protected void drawWheels(GraphicsContext gc) {
-        gc.save();  // Save current transform
+        gc.save();
         gc.translate(x, y);
         gc.rotate(direction);
 
         // Draw treads
-        gc.setFill(Color.BLACK);
         double treadWidth = radius * 0.3;
         double treadLength = radius * 1.8;
+        gc.setFill(Color.DARKGRAY);
 
-        // Left tread
-        gc.fillRect(-radius - treadWidth, -treadLength / 2, treadWidth, treadLength);
-        // Right tread
-        gc.fillRect(radius, -treadLength / 2, treadWidth, treadLength);
+        // Left tread with detail
+        gc.fillRoundRect(-radius - treadWidth, -treadLength / 2,
+                treadWidth, treadLength, 5, 5);
 
-        // Optional: draw tread lines for visual detail
-        gc.setStroke(Color.DARKGRAY);
+        // Right tread with detail
+        gc.fillRoundRect(radius, -treadLength / 2,
+                treadWidth, treadLength, 5, 5);
+
+        // Tread details
+        gc.setStroke(Color.BLACK);
         gc.setLineWidth(1);
-        for (double yy = -treadLength / 2; yy < treadLength / 2; yy += treadLength / 6) {
-            gc.strokeLine(-radius - treadWidth, yy, -radius, yy);
-            gc.strokeLine(radius, yy, radius + treadWidth, yy);
+        for (double i = -treadLength / 2; i < treadLength / 2; i += treadLength / 8) {
+            // Left tread lines
+            gc.strokeLine(-radius - treadWidth, i, -radius, i);
+            // Right tread lines
+            gc.strokeLine(radius, i, radius + treadWidth, i);
         }
 
-        gc.restore();  // Restore original transform
+        gc.restore();
+    }
+
+    /**
+     * Draws enhanced sensors including sensor range and multiple whiskers.
+     *
+     * @param gc The GraphicsContext used for drawing.
+     */
+    private void drawEnhancedSensors(GraphicsContext gc) {
+        // Draw sensor range indicator
+        gc.setFill(Color.LIGHTBLUE);
+        gc.setGlobalAlpha(0.2);
+        gc.fillOval(x - sensorRange, y - sensorRange,
+                sensorRange * 2, sensorRange * 2);
+        gc.setGlobalAlpha(1.0);
+
+        // Draw whisker sensors
+        gc.setStroke(Color.BLACK);
+        gc.setLineWidth(2);
+        double radians = Math.toRadians(direction);
+
+        // Center whisker
+        drawWhisker(gc, radians);
+        // Left whisker
+        drawWhisker(gc, radians - Math.PI / 6);
+        // Right whisker
+        drawWhisker(gc, radians + Math.PI / 6);
+    }
+
+    /**
+     * Draws a single whisker line based on the given angle.
+     *
+     * @param gc     The GraphicsContext used for drawing.
+     * @param angle  The angle in radians for the whisker direction.
+     */
+    private void drawWhisker(GraphicsContext gc, double angle) {
+        double whiskerEndX = x + whiskerLength * Math.cos(angle);
+        double whiskerEndY = y + whiskerLength * Math.sin(angle);
+        gc.strokeLine(x, y, whiskerEndX, whiskerEndY);
+    }
+
+    /**
+     * Draws a direction indicator to show the robot's current facing direction.
+     *
+     * @param gc The GraphicsContext used for drawing.
+     */
+    private void drawDirectionIndicator(GraphicsContext gc) {
+        gc.setStroke(Color.RED);
+        gc.setLineWidth(3);
+        double indicatorLength = radius * 1.2;
+        double radians = Math.toRadians(direction);
+        double endX = x + indicatorLength * Math.cos(radians);
+        double endY = y + indicatorLength * Math.sin(radians);
+        gc.strokeLine(x, y, endX, endY);
+    }
+
+    /**
+     * Draws a selection highlight around the robot when it is selected.
+     *
+     * @param gc The GraphicsContext used for drawing.
+     */
+    private void drawSelectionEffect(GraphicsContext gc) {
+        gc.setStroke(Color.YELLOW);
+        gc.setLineWidth(3);
+        gc.strokeOval(x - radius - 5, y - radius - 5,
+                (radius + 5) * 2, (radius + 5) * 2);
     }
 
     /**
@@ -342,6 +410,22 @@ public class Robot extends ArenaItem {
      */
     public void setCurrentWhiskerLength(double whiskerLength) {
         this.whiskerLength = whiskerLength;
+    }
+
+    /**
+     * Sets the selection state of the robot.
+     *
+     * @param selected True if the robot is selected, false otherwise.
+     */
+    public void setSelected(boolean selected) {
+        this.isSelected = selected;
+    }
+
+    /**
+     * @return The selection state of the robot.
+     */
+    public boolean isSelected() {
+        return isSelected;
     }
 
     /**

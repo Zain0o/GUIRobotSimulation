@@ -10,12 +10,17 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.image.Image;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import javafx.scene.input.MouseButton;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.scene.Node;
 
 /**
  * The MainApp class serves as the entry point for the Robot Simulator application.
@@ -34,205 +39,614 @@ public class MainApp extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        // Initialize the main layout using BorderPane
         BorderPane root = new BorderPane();
 
-        // Replace setStyle(...) with a background fill
-        root.setBackground(
-                new Background(
-                        new BackgroundFill(Color.web("#f5f6fa"), CornerRadii.EMPTY, Insets.EMPTY)
-                )
-        );
-
-        // Create and set up the menu bar
-        MenuBar menuBar = createMenuBar();
-        root.setTop(menuBar);
-
-        // Initialize the Robot Arena and related components
-        initializeArena();
-
-        // Initialize and set up GUI components (ArenaView, ControlPanel, Status Panel)
-        initializeGUIComponents(root);
-
-        // Initialize and start the animation loop
+        initializeArena();           // Moved to a single definition
+        initializeMainLayout(root);
         initializeAnimation();
 
-        // Create the main scene and set it on the primary stage
-        Scene scene = new Scene(root, 1200, 800); // Increased window size for better visibility
-
+        Scene scene = new Scene(root, 1200, 800);
         primaryStage.setTitle("Robot Simulator");
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        // Initialize mouse and keyboard controls for user interactions
         initializeMouseControls();
         initializeKeyboardControls(scene);
     }
 
     /**
-     * Creates the application menu bar with File and Help menus,
-     * using setGraphic(...) on Menu/MenuItems to style text color in pure Java.
+     * Initializes the main layout by setting up top, center, right, and bottom sections.
      *
-     * @return A MenuBar instance with configured menus.
+     * @param root the BorderPane to set up
      */
-    private MenuBar createMenuBar() {
+    private void initializeMainLayout(BorderPane root) {
+        root.setTop(createEnhancedMenuBar());
+        root.setCenter(createMainArenaSection());
+        root.setRight(createEnhancedStatusPanel());
+        root.setBottom(createEnhancedControlPanel());
+        root.setBackground(new Background(new BackgroundFill(
+                Color.web("#f5f6fa"), CornerRadii.EMPTY, Insets.EMPTY)));
+    }
+
+    /**
+     * Creates the main arena section with a title and canvas.
+     *
+     * @return the VBox containing the main arena section
+     */
+    private VBox createMainArenaSection() {
+        VBox arenaSection = new VBox(10);
+        arenaSection.setPadding(new Insets(20));
+        arenaSection.setAlignment(Pos.TOP_CENTER);
+
+        Label title = new Label("Robot Arena Simulation");
+        title.setFont(Font.font("System", FontWeight.BOLD, 32));
+        title.setTextFill(Color.web("#2c3e50"));
+
+        Canvas canvas = arenaView.getCanvas();
+        StackPane canvasWrapper = new StackPane(canvas);
+        canvasWrapper.setBackground(new Background(new BackgroundFill(
+                Color.WHITE, new CornerRadii(5), Insets.EMPTY)));
+        canvasWrapper.setEffect(new DropShadow(10, Color.rgb(0, 0, 0, 0.2)));
+
+        arenaSection.getChildren().addAll(title, canvasWrapper);
+        return arenaSection;
+    }
+
+    /**
+     * Creates an enhanced MenuBar with modern styling.
+     *
+     * @return the enhanced MenuBar
+     */
+    private MenuBar createEnhancedMenuBar() {
         MenuBar menuBar = new MenuBar();
+        menuBar.setBackground(new Background(new BackgroundFill(
+                Color.web("#2c3e50"), CornerRadii.EMPTY, Insets.EMPTY)));
 
-        // Set a background color for the MenuBar
-        menuBar.setBackground(
-                new Background(
-                        new BackgroundFill(Color.web("#34495e"), CornerRadii.EMPTY, Insets.EMPTY)
-                )
-        );
-
-        // === FILE MENU ===
-        Menu fileMenu = createColoredMenu("File", Color.WHITE);
-
-        MenuItem newArenaItem = createColoredMenuItem("New Arena", Color.BLACK);
-        newArenaItem.setOnAction(e -> {
-            resetArena();
-            updateStatus("New arena initialized.");
-        });
-
-        MenuItem saveArenaItem = createColoredMenuItem("Save Arena", Color.BLACK);
-        saveArenaItem.setOnAction(e -> controlPanel.handleSave());
-
-        MenuItem loadArenaItem = createColoredMenuItem("Load Arena", Color.BLACK);
-        loadArenaItem.setOnAction(e -> controlPanel.handleLoad());
-
-        MenuItem exitItem = createColoredMenuItem("Exit", Color.BLACK);
-        exitItem.setOnAction(e -> System.exit(0));
-
+        Menu fileMenu = createStyledMenu("File");
         fileMenu.getItems().addAll(
-                newArenaItem,
-                saveArenaItem,
-                loadArenaItem,
+                createMenuItem("New Arena", "⭐", e -> resetArena()),
+                createMenuItem("Save Arena", "💾", e -> controlPanel.handleSave()),
+                createMenuItem("Load Arena", "📂", e -> controlPanel.handleLoad()),
                 new SeparatorMenuItem(),
-                exitItem
+                createMenuItem("Exit", "❌", e -> System.exit(0))
         );
 
-        // === HELP MENU ===
-        Menu helpMenu = createColoredMenu("Help", Color.WHITE);
+        Menu helpMenu = createStyledMenu("Help");
+        helpMenu.getItems().addAll(
+                createMenuItem("About", "ℹ️", e -> showEnhancedAboutDialog()), // SINGLE definition
+                createMenuItem("Help", "❓", e -> showHelpDialog())             // SINGLE definition
+        );
 
-        MenuItem aboutItem = createColoredMenuItem("About", Color.BLACK);
-        aboutItem.setOnAction(e -> showAboutDialog());
-
-        MenuItem helpItem = createColoredMenuItem("Help", Color.BLACK);
-        helpItem.setOnAction(e -> showHelpDialog());
-
-        helpMenu.getItems().addAll(aboutItem, helpItem);
-
-        // Add File and Help menus to the menu bar
         menuBar.getMenus().addAll(fileMenu, helpMenu);
-
         return menuBar;
     }
 
     /**
-     * Helper method to create a Menu with a given text and text color,
-     * avoiding direct CSS usage by setting a Label as the graphic.
+     * Creates a styled Menu with white text.
+     *
+     * @param text the menu title
+     * @return the styled Menu
      */
-    private Menu createColoredMenu(String menuText, Color textColor) {
+    private Menu createStyledMenu(String text) {
         Menu menu = new Menu();
-        Label lbl = new Label(menuText);
-        lbl.setTextFill(textColor);
-        lbl.setFont(Font.font("System", FontWeight.NORMAL, 14));
-        menu.setGraphic(lbl);
+        Label label = new Label(text);
+        label.setTextFill(Color.WHITE);
+        label.setFont(Font.font("System", FontWeight.NORMAL, 14));
+        menu.setGraphic(label);
         return menu;
     }
 
     /**
-     * Helper method to create a MenuItem with a given text and text color.
+     * Creates a styled MenuItem with an icon and text.
+     *
+     * @param text    the display text of the menu item
+     * @param icon    the icon representing the menu item
+     * @param action  the action to perform on selection
+     * @return the styled MenuItem
      */
-    private MenuItem createColoredMenuItem(String itemText, Color textColor) {
+    private MenuItem createMenuItem(String text, String icon, EventHandler<ActionEvent> action) {
         MenuItem item = new MenuItem();
-        Label lbl = new Label(itemText);
-        lbl.setTextFill(textColor);
-        lbl.setFont(Font.font("System", FontWeight.NORMAL, 14));
-        item.setGraphic(lbl);
+        HBox content = new HBox(10);
+        Label iconLabel = new Label(icon);
+        Label textLabel = new Label(text);
+        textLabel.setTextFill(Color.BLACK);
+        content.getChildren().addAll(iconLabel, textLabel);
+        item.setGraphic(content);
+        item.setOnAction(action);
         return item;
     }
 
     /**
-     * Initializes the RobotArena with default robots and obstacles.
+     * Creates an enhanced status panel with robot and obstacle counts,
+     * selected item info, and arena metrics.
+     *
+     * @return the enhanced status panel VBox
+     */
+    private VBox createEnhancedStatusPanel() {
+        VBox statusPanel = new VBox(15);
+        statusPanel.setPadding(new Insets(20));
+        statusPanel.setPrefWidth(300);
+        statusPanel.setBackground(new Background(new BackgroundFill(
+                Color.WHITE, new CornerRadii(10), Insets.EMPTY)));
+        statusPanel.setEffect(new DropShadow(10, Color.rgb(0, 0, 0, 0.1)));
+
+        Label title = new Label("Arena Status");
+        title.setFont(Font.font("System", FontWeight.BOLD, 24));
+        title.setTextFill(Color.web("#2c3e50"));
+
+        GridPane statsGrid = new GridPane();
+        statsGrid.setHgap(10);
+        statsGrid.setVgap(10);
+
+        // Initialize labels
+        robotCountLabel = new Label("0");
+        robotCountLabel.setFont(Font.font("System", FontWeight.NORMAL, 16));
+        obstacleCountLabel = new Label("0");
+        obstacleCountLabel.setFont(Font.font("System", FontWeight.NORMAL, 16));
+
+        // Robot Stats
+        statsGrid.add(createStatIcon("🤖"), 0, 0);
+        statsGrid.add(robotCountLabel, 1, 0);
+
+        // Obstacle Stats
+        statsGrid.add(createStatIcon("🚧"), 0, 1);
+        statsGrid.add(obstacleCountLabel, 1, 1);
+
+        // Selected Item Info
+        VBox selectedItemInfo = new VBox(5);
+        Label selectedLabel = new Label("Selected Item");
+        selectedLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+        TextArea itemDetails = new TextArea();
+        itemDetails.setEditable(false);
+        itemDetails.setPrefRowCount(3);
+        selectedItemInfo.getChildren().addAll(selectedLabel, itemDetails);
+
+        // Arena Metrics
+        VBox metrics = createMetricsPanel();
+
+        statusPanel.getChildren().addAll(
+                title,
+                new Separator(),
+                statsGrid,
+                new Separator(),
+                selectedItemInfo,
+                new Separator(),
+                metrics
+        );
+
+        return statusPanel;
+    }
+
+    /**
+     * Creates an icon label for stats.
+     *
+     * @param icon the emoji/icon string
+     * @return the Label with the icon
+     */
+    private Label createStatIcon(String icon) {
+        Label label = new Label(icon);
+        label.setFont(Font.font("System", 20));
+        return label;
+    }
+
+    /**
+     * Creates the arena metrics panel.
+     *
+     * @return the VBox containing arena metrics
+     */
+    private VBox createMetricsPanel() {
+        VBox metrics = new VBox(10);
+
+        Label metricsTitle = new Label("Arena Metrics");
+        metricsTitle.setFont(Font.font("System", FontWeight.BOLD, 14));
+        metricsTitle.setTextFill(Color.web("#2c3e50"));
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(5);
+
+        grid.add(new Label("Size:"), 0, 0);
+        grid.add(new Label("800x600"), 1, 0);
+
+        grid.add(new Label("Active:"), 0, 1);
+        Label activeStatus = new Label("Running");
+        activeStatus.setTextFill(Color.GREEN);
+        grid.add(activeStatus, 1, 1);
+
+        grid.add(new Label("Speed:"), 0, 2);
+        Label speedValue = new Label("1.0x");
+        grid.add(speedValue, 1, 2);
+
+        metrics.getChildren().addAll(metricsTitle, grid);
+        return metrics;
+    }
+
+    /**
+     * Creates an enhanced control panel with robot controls and simulation controls.
+     *
+     * @return the enhanced control panel HBox
+     */
+    private HBox createEnhancedControlPanel() {
+        HBox controlPanel = new HBox(20);
+        controlPanel.setPadding(new Insets(15));
+        // ------------------ FIX: Use a valid CornerRadii constructor for top corners  -----------------------
+        controlPanel.setBackground(new Background(new BackgroundFill(
+                Color.WHITE,
+                new CornerRadii(10, 10, 0, 0, false),  // <--- Corrected here
+                Insets.EMPTY
+        )));
+        // ----------------------------------------------------------------------------------------------------
+
+        VBox robotControls = createRobotControls();
+        VBox simulationControls = createSimulationControls();
+
+        controlPanel.getChildren().addAll(robotControls, simulationControls);
+        return controlPanel;
+    }
+
+    /**
+     * Creates the robot controls section with buttons to add different robot types.
+     *
+     * @return the VBox containing robot controls
+     */
+    private VBox createRobotControls() {
+        VBox controls = new VBox(10);
+        controls.setPadding(new Insets(10));
+        controls.setBackground(new Background(new BackgroundFill(
+                Color.WHITE, new CornerRadii(5), Insets.EMPTY)));
+
+        Label title = new Label("Robot Controls");
+        title.setFont(Font.font("System", FontWeight.BOLD, 18));
+
+        GridPane robotButtons = new GridPane();
+        robotButtons.setHgap(10);
+        robotButtons.setVgap(10);
+
+        robotButtons.add(createRobotButton("Basic", "🤖", e -> {
+            robotArena.addRobot();
+            arenaView.render();
+            updateStatus("Basic Robot added.");
+        }), 0, 0);
+        robotButtons.add(createRobotButton("Chaser", "🏃", e -> {
+            robotArena.addChaserRobot();
+            arenaView.render();
+            updateStatus("Chaser Robot added.");
+        }), 1, 0);
+        robotButtons.add(createRobotButton("Beam", "📡", e -> {
+            robotArena.addBeamRobot();
+            arenaView.render();
+            updateStatus("Beam Robot added.");
+        }), 0, 1);
+        robotButtons.add(createRobotButton("Bump", "💫", e -> {
+            robotArena.addBumpRobot();
+            arenaView.render();
+            updateStatus("Bump Robot added.");
+        }), 1, 1);
+
+        controls.getChildren().addAll(title, robotButtons);
+        return controls;
+    }
+
+    /**
+     * Creates a robot button with specified type and icon.
+     *
+     * @param type   the type of the robot
+     * @param icon   the emoji/icon representing the robot
+     * @param action the action to perform on button click
+     * @return the styled Button
+     */
+    private Button createRobotButton(String type, String icon, EventHandler<ActionEvent> action) {
+        Button button = new Button();
+        VBox content = new VBox(5);
+        content.setAlignment(Pos.CENTER);
+
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("System", 24));
+        Label typeLabel = new Label(type);
+        typeLabel.setFont(Font.font("System", 12));
+
+        content.getChildren().addAll(iconLabel, typeLabel);
+        button.setGraphic(content);
+        button.setOnAction(action);
+        button.setPrefSize(80, 80);
+        button.setBackground(new Background(new BackgroundFill(
+                Color.WHITE, new CornerRadii(5), Insets.EMPTY)));
+        button.setEffect(new DropShadow(5, Color.rgb(0, 0, 0, 0.1)));
+
+        return button;
+    }
+
+    /**
+     * Creates the simulation controls section with speed slider and start/stop buttons.
+     *
+     * @return the VBox containing simulation controls
+     */
+    private VBox createSimulationControls() {
+        VBox controls = new VBox(10);
+        controls.setPadding(new Insets(10));
+
+        Label title = new Label("Simulation Controls");
+        title.setFont(Font.font("System", FontWeight.BOLD, 18));
+
+        HBox speedControl = new HBox(10);
+        speedControl.setAlignment(Pos.CENTER_LEFT);
+        Label speedLabel = new Label("Speed:");
+        Slider speedSlider = new Slider(0.5, 2.0, 1.0);
+        speedSlider.setShowTickLabels(true);
+        speedSlider.setShowTickMarks(true);
+        speedSlider.setMajorTickUnit(0.5);
+        speedSlider.setMinorTickCount(4);
+        speedSlider.setBlockIncrement(0.1);
+        speedSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            // Adjust animation speed based on slider value
+            animationTimer.stop();
+            animationTimer = new AnimationTimer() {
+                private long lastUpdate = 0;
+                private double speed = newVal.doubleValue();
+
+                @Override
+                public void handle(long now) {
+                    if (now - lastUpdate >= 16_666_667 / speed) { // Approximately 60 FPS / speed
+                        if (isAnimating) {
+                            robotArena.moveRobots();
+                            arenaView.render();
+                            updateStatus();
+                        }
+                        lastUpdate = now;
+                    }
+                }
+            };
+            animationTimer.start();
+            updateStatus("Speed set to " + String.format("%.1fx", newVal.doubleValue()));
+        });
+        speedControl.getChildren().addAll(speedLabel, speedSlider);
+
+        HBox buttons = new HBox(10);
+        buttons.setAlignment(Pos.CENTER_LEFT);
+        buttons.getChildren().addAll(
+                createControlButton("Start", "▶", e -> toggleAnimation(true)),
+                createControlButton("Stop", "⏸", e -> toggleAnimation(false))
+        );
+
+        controls.getChildren().addAll(title, speedControl, buttons);
+        return controls;
+    }
+
+    /**
+     * Creates a control button with specified text and icon.
+     *
+     * @param text   the button text
+     * @param icon   the emoji/icon representing the action
+     * @param action the action to perform on button click
+     * @return the styled Button
+     */
+    private Button createControlButton(String text, String icon, EventHandler<ActionEvent> action) {
+        Button button = new Button();
+        HBox content = new HBox(5);
+        content.setAlignment(Pos.CENTER);
+
+        Label iconLabel = new Label(icon);
+        Label textLabel = new Label(text);
+        content.getChildren().addAll(iconLabel, textLabel);
+
+        button.setGraphic(content);
+        button.setOnAction(action);
+        button.setPrefWidth(100);
+        button.setPrefHeight(30);
+        button.setBackground(new Background(new BackgroundFill(
+                Color.web("#3498db"), new CornerRadii(5), Insets.EMPTY)));
+        button.setTextFill(Color.WHITE);
+        button.setFont(Font.font("System", FontWeight.BOLD, 14));
+        button.setEffect(new DropShadow(3, Color.rgb(0, 0, 0, 0.2)));
+
+        return button;
+    }
+
+    // ------------------------------------------------------------------------
+    // Help-Dialog-Related Methods (SINGLE DEFINITIONS ONLY)
+    // ------------------------------------------------------------------------
+
+    /**
+     * Displays the Help dialog with multiple tabs for Controls, Robots, and Features.
+     */
+    private void showHelpDialog() {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Robot Simulator Help");
+
+        TabPane tabs = new TabPane();
+        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        tabs.getTabs().addAll(
+                createControlsHelp(),
+                createRobotsHelp(),
+                createFeaturesHelp()
+        );
+
+        dialog.getDialogPane().setContent(tabs);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.getDialogPane().setPrefSize(500, 400);
+
+        dialog.showAndWait();
+    }
+
+    /**
+     * Creates the Controls tab for the Help dialog.
+     *
+     * @return the Controls Tab
+     */
+    private Tab createControlsHelp() {
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+
+        content.getChildren().addAll(
+                createHelpSection("Keyboard Controls",
+                        "• Arrow Keys: Move selected robot\n" +
+                                "• Delete: Remove selected robot\n" +
+                                "• Space: Pause/Resume simulation"),
+
+                createHelpSection("Mouse Controls",
+                        "• Left Click: Select robot\n" +
+                                "• Right Click: Show context menu\n" +
+                                "• Drag: Move selected robot"),
+
+                createHelpSection("Simulation Controls",
+                        "• Speed Slider: Adjust simulation speed\n" +
+                                "• Start/Stop: Control animation\n" +
+                                "• Clear: Reset arena")
+        );
+
+        return new Tab("Controls", content);
+    }
+
+    /**
+     * Creates the Robots tab for the Help dialog.
+     *
+     * @return the Robots Tab
+     */
+    private Tab createRobotsHelp() {
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+
+        content.getChildren().addAll(
+                createHelpSection("Basic Robot",
+                        "Standard robot with collision avoidance\n" +
+                                "Blue color, visible sensors"),
+
+                createHelpSection("Chaser Robot",
+                        "Pursues nearest robot\n" +
+                                "Red color, dynamic targeting"),
+
+                createHelpSection("Beam Robot",
+                        "Uses beam sensors for navigation\n" +
+                                "Shows sensor lines in real-time"),
+
+                createHelpSection("Bump Robot",
+                        "Advanced collision response\n" +
+                                "Visual feedback on impacts")
+        );
+
+        return new Tab("Robots", content);
+    }
+
+    /**
+     * Creates the Features tab for the Help dialog.
+     *
+     * @return the Features Tab
+     */
+    private Tab createFeaturesHelp() {
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+
+        content.getChildren().addAll(
+                createHelpSection("Arena Management",
+                        "• Save/Load arena configurations\n" +
+                                "• Add/Remove robots and obstacles\n" +
+                                "• Real-time status updates"),
+
+                createHelpSection("Simulation Features",
+                        "• Variable speed control\n" +
+                                "• Multiple robot types\n" +
+                                "• Collision detection\n" +
+                                "• Interactive controls")
+        );
+
+        return new Tab("Features", content);
+    }
+
+    /**
+     * Creates a help section with a title and content.
+     *
+     * @param title       the title of the help section
+     * @param contentText the descriptive text of the help section
+     * @return the VBox containing the help section
+     */
+    private VBox createHelpSection(String title, String contentText) {
+        VBox section = new VBox(5);
+
+        Label titleLabel = new Label(title);
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 16));
+        titleLabel.setTextFill(Color.web("#2c3e50"));
+
+        Label contentLabel = new Label(contentText);
+        contentLabel.setWrapText(true);
+        contentLabel.setTextFill(Color.web("#34495e"));
+
+        section.getChildren().addAll(titleLabel, contentLabel);
+        return section;
+    }
+
+    /**
+     * Displays the "About" dialog with project details and features.
+     */
+    private void showEnhancedAboutDialog() {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Robot Simulator");
+
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setBackground(new Background(new BackgroundFill(
+                Color.WHITE, null, null)));
+
+        // Title
+        Label title = new Label("Robot Arena Simulator v1.0");
+        title.setFont(Font.font("System", FontWeight.BOLD, 24));
+        title.setTextFill(Color.web("#2c3e50"));
+
+        // Features section
+        VBox features = new VBox(8);
+        features.getChildren().addAll(
+                createFeatureLabel("Multiple Robot Types", "🤖"),
+                createFeatureLabel("Real-time Collision Detection", "💫"),
+                createFeatureLabel("Interactive Controls", "🎮"),
+                createFeatureLabel("Simulation Management", "⚙️")
+        );
+
+        // Credits section
+        Label credits = new Label("CS2OP Coursework Project\nDeveloped by [Your Name]");
+        credits.setTextFill(Color.web("#34495e"));
+        credits.setFont(Font.font("System", FontWeight.NORMAL, 14));
+
+        content.getChildren().addAll(title, new Separator(), features, new Separator(), credits);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        dialog.showAndWait();
+    }
+
+    /**
+     * Creates a feature label with an icon and text.
+     *
+     * @param text the feature description
+     * @param icon the emoji/icon representing the feature
+     * @return the styled Label
+     */
+    private Label createFeatureLabel(String text, String icon) {
+        Label label = new Label(icon + " " + text);
+        label.setFont(Font.font("System", 14));
+        label.setTextFill(Color.web("#34495e"));
+        return label;
+    }
+
+    // ------------------------------------------------------------------------
+    // Arena and Animation Initialization (SINGLE DEFINITIONS ONLY)
+    // ------------------------------------------------------------------------
+
+    /**
+     * Initializes the arena by creating robots and obstacles.
      */
     private void initializeArena() {
-        // You might rely on ArenaView's default canvas size or let it be dynamic
         robotArena = new RobotArena(800, 600);
         robotArena.addRobot();
         robotArena.addObstacle();
         robotArena.addChaserRobot();
         arenaView = new ArenaView(robotArena);
-        controlPanel = new ControlPanel(robotArena, arenaView);
+        // Pass 'this' if needed by ControlPanel
+        controlPanel = new ControlPanel(this, robotArena, arenaView);
     }
 
     /**
-     * Initializes and arranges the GUI components within the main layout.
-     *
-     * @param root The BorderPane serving as the main layout.
-     */
-    private void initializeGUIComponents(BorderPane root) {
-        // === CENTER: Title + Arena (Canvas) in a VBox ===
-        VBox centerPanel = new VBox(10);
-        centerPanel.setAlignment(Pos.TOP_CENTER);
-        centerPanel.setPadding(new Insets(20));
-
-        Label titleLabel = new Label("Robot Arena Simulation");
-        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 32));
-        titleLabel.setTextFill(Color.BLACK);
-
-        // Add title + canvas
-        Canvas arenaCanvas = arenaView.getCanvas();
-        centerPanel.getChildren().addAll(titleLabel, arenaCanvas);
-        root.setCenter(centerPanel);
-
-        // === RIGHT: Status Panel in a VBox ===
-        VBox statusPanel = new VBox(10);
-        statusPanel.setPadding(new Insets(20));
-
-        // White background with rounded corners
-        statusPanel.setBackground(
-                new Background(
-                        new BackgroundFill(Color.WHITE, new CornerRadii(10), Insets.EMPTY)
-                )
-        );
-        statusPanel.setPrefWidth(300);
-
-        Label statusTitle = new Label("Arena Status");
-        statusTitle.setFont(Font.font("System", FontWeight.BOLD, 20));
-        statusTitle.setTextFill(Color.web("#2c3e50"));
-
-        robotCountLabel = new Label("Robots: 0");
-        robotCountLabel.setFont(Font.font("System", 16));
-        robotCountLabel.setTextFill(Color.BLACK);
-
-        obstacleCountLabel = new Label("Obstacles: 0");
-        obstacleCountLabel.setFont(Font.font("System", 16));
-        obstacleCountLabel.setTextFill(Color.BLACK);
-
-        statusPanel.getChildren().addAll(
-                statusTitle,
-                robotCountLabel,
-                obstacleCountLabel
-        );
-        root.setRight(statusPanel);
-
-        // === BOTTOM: Adaptive Layout with a FlowPane ===
-        FlowPane bottomPane = new FlowPane();
-        bottomPane.setHgap(15);
-        bottomPane.setVgap(10);
-        bottomPane.setPadding(new Insets(10));
-        bottomPane.setAlignment(Pos.CENTER_LEFT);
-
-        // Add your existing ControlPanel (which is an HBox internally) to the FlowPane
-        bottomPane.getChildren().add(controlPanel.getPanel());
-
-        // Place this FlowPane at the bottom of the BorderPane
-        root.setBottom(bottomPane);
-    }
-
-    /**
-     * Initializes the animation loop for the simulation using AnimationTimer.
+     * Initializes the animation timer to move robots and render the arena.
      */
     private void initializeAnimation() {
         animationTimer = new AnimationTimer() {
@@ -249,7 +663,7 @@ public class MainApp extends Application {
     }
 
     /**
-     * Initializes mouse controls for selecting robots by clicking on them.
+     * Initializes mouse controls for selecting robots in the arena.
      */
     private void initializeMouseControls() {
         arenaView.getCanvas().setOnMouseClicked(e -> {
@@ -266,9 +680,9 @@ public class MainApp extends Application {
     }
 
     /**
-     * Initializes keyboard controls for moving the selected robot and toggling animation.
+     * Initializes keyboard controls for moving robots and controlling the simulation.
      *
-     * @param scene The main application scene.
+     * @param scene the main Scene
      */
     private void initializeKeyboardControls(Scene scene) {
         scene.setOnKeyPressed(event -> {
@@ -289,10 +703,10 @@ public class MainApp extends Application {
     }
 
     /**
-     * Moves the selected robot by the specified deltas.
+     * Moves the selected robot by the specified delta values.
      *
-     * @param dx Change in X-coordinate.
-     * @param dy Change in Y-coordinate.
+     * @param dx change in x-coordinate
+     * @param dy change in y-coordinate
      */
     private void moveSelectedRobot(double dx, double dy) {
         if (robotArena.getSelectedItem() instanceof Robot selectedRobot) {
@@ -311,15 +725,12 @@ public class MainApp extends Application {
                     )
             );
 
-            // Check for collisions before moving
             if (!robotArena.isColliding(newX, newY, selectedRobot.getRadius(), selectedRobot.getId())) {
                 selectedRobot.setX(newX);
                 selectedRobot.setY(newY);
-                // Updated line using reflection to get the class name
                 updateStatus("Moved " + selectedRobot.getClass().getSimpleName() +
                         " to (" + newX + ", " + newY + ")");
             } else {
-                // Updated line using reflection to get the class name
                 updateStatus("Cannot move " + selectedRobot.getClass().getSimpleName() +
                         " to (" + newX + ", " + newY + ") - Collision detected.");
             }
@@ -327,7 +738,7 @@ public class MainApp extends Application {
     }
 
     /**
-     * Updates the status panel with the current number of robots and obstacles.
+     * Updates the status panel with current robot and obstacle counts.
      */
     private void updateStatus() {
         long robotCount = robotArena.getItems().stream()
@@ -342,7 +753,17 @@ public class MainApp extends Application {
     }
 
     /**
-     * Resets the arena to its default state with initial robots and obstacles.
+     * Logs a status message to the console.
+     *
+     * @param message the status message
+     */
+    private void updateStatus(String message) {
+        System.out.println(message);
+        updateStatus(); // Also refresh counts, if desired
+    }
+
+    /**
+     * Resets the arena to its default state.
      */
     private void resetArena() {
         robotArena.clearArena();
@@ -354,29 +775,7 @@ public class MainApp extends Application {
     }
 
     /**
-     * Starts the animation loop.
-     */
-    private void startAnimation() {
-        if (!isAnimating) {
-            isAnimating = true;
-            animationTimer.start();
-            updateStatus("Animation started.");
-        }
-    }
-
-    /**
-     * Stops the animation loop.
-     */
-    private void stopAnimation() {
-        if (isAnimating) {
-            isAnimating = false;
-            animationTimer.stop();
-            updateStatus("Animation stopped.");
-        }
-    }
-
-    /**
-     * Toggles the animation between running and paused states.
+     * Toggles the animation state between running and paused.
      */
     private void toggleAnimation() {
         if (isAnimating) {
@@ -387,82 +786,46 @@ public class MainApp extends Application {
     }
 
     /**
-     * Displays the About dialog with application information.
-     */
-    private void showAboutDialog() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("About Robot Simulator");
-        alert.setHeaderText("Robot Simulator v1.0");
-        alert.setContentText(
-                "Developed by [Your Name]\n" +
-                        "University of [Your University]\n" +
-                        "Course: CS2OP\n\n" +
-                        "A simulation of various robots interacting within an arena."
-        );
-        alert.showAndWait();
-    }
-
-    /**
-     * Displays the Help dialog with usage instructions.
-     */
-    private void showHelpDialog() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Help - Robot Simulator");
-        alert.setHeaderText("How to Use the Simulator");
-        alert.setContentText(
-                "• **Adding Robots:** Use the 'Robot Controls' section in the control panel " +
-                        "to select and add different types of robots to the arena.\n" +
-                        "• **Adding Obstacles:** Click 'Add Obstacle' in the control panel to place " +
-                        "obstacles within the arena.\n" +
-                        "• **Clearing Arena:** Use 'Clear Arena' to remove all items and reset the " +
-                        "arena to its default state.\n" +
-                        "• **Saving and Loading:** Save your current arena configuration using " +
-                        "'Save Arena' and load a saved configuration with 'Load Arena' in the File menu.\n" +
-                        "• **Adjusting Speed:** Slide the simulation speed slider to control the pace " +
-                        "of the simulation.\n" +
-                        "• **Interacting with Items:** Click on items within the arena to select them. " +
-                        "Use arrow keys to move the selected robot or press DELETE to remove it.\n" +
-                        "• **Animation Control:** Press SPACE to pause or resume the simulation.\n" +
-                        "• **About:** Access information about the application and its developers " +
-                        "through the About menu item."
-        );
-        alert.showAndWait();
-    }
-
-    /**
-     * Updates the status label with the given message.
+     * Toggles the animation state based on the provided boolean.
      *
-     * @param message The status message to display.
+     * @param start true to start animation, false to stop
      */
-    private void updateStatus(String message) {
-        controlPanel.updateStatus(message);
+    public void toggleAnimation(boolean start) {
+        if (start) {
+            startAnimation();
+        } else {
+            stopAnimation();
+        }
     }
 
     /**
-     * Main entry point for the application.
+     * Starts the animation timer.
+     */
+    private void startAnimation() {
+        if (!isAnimating) {
+            isAnimating = true;
+            animationTimer.start();
+            updateStatus("Animation started.");
+        }
+    }
+
+    /**
+     * Stops the animation timer.
+     */
+    private void stopAnimation() {
+        if (isAnimating) {
+            isAnimating = false;
+            animationTimer.stop();
+            updateStatus("Animation stopped.");
+        }
+    }
+
+    /**
+     * The main method to launch the JavaFX application.
      *
-     * @param args Command-line arguments.
+     * @param args command-line arguments
      */
     public static void main(String[] args) {
         launch(args);
-    }
-
-    /**
-     * Toggles the animation state.
-     *
-     * @param start True to start the animation, false to stop.
-     */
-    public static void toggleAnimation(boolean start) {
-        if (start) {
-            isAnimating = true;
-            if (animationTimer != null) {
-                animationTimer.start();
-            }
-        } else {
-            isAnimating = false;
-            if (animationTimer != null) {
-                animationTimer.stop();
-            }
-        }
     }
 }

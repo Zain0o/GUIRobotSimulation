@@ -26,14 +26,17 @@ public class ControlPanel {
     private final ArenaView arenaView;
     private final Slider speedControl;
     private final Label statusLabel;
+    private final MainApp mainApp; // Reference to MainApp instance
 
     /**
-     * Constructor to initialize the ControlPanel with the given RobotArena and ArenaView.
+     * Constructor to initialize the ControlPanel with the given MainApp, RobotArena, and ArenaView.
      *
+     * @param mainApp    The MainApp instance to control animation.
      * @param robotArena The RobotArena instance to be controlled.
      * @param arenaView  The ArenaView instance for rendering updates.
      */
-    public ControlPanel(RobotArena robotArena, ArenaView arenaView) {
+    public ControlPanel(MainApp mainApp, RobotArena robotArena, ArenaView arenaView) {
+        this.mainApp = mainApp;
         this.robotArena = robotArena;
         this.arenaView = arenaView;
         this.panel = new HBox(20);  // Horizontal layout with spacing
@@ -299,12 +302,12 @@ public class ControlPanel {
         Button startButton = createStyledButton(
                 "Start",
                 "Start simulation",
-                e -> MainApp.toggleAnimation(true)
+                e -> mainApp.toggleAnimation(true) // Updated to use instance reference
         );
         Button stopButton = createStyledButton(
                 "Stop",
                 "Stop simulation",
-                e -> MainApp.toggleAnimation(false)
+                e -> mainApp.toggleAnimation(false) // Updated to use instance reference
         );
         buttonBox.getChildren().addAll(startButton, stopButton);
 

@@ -32,7 +32,7 @@ public class BeamRobot extends Robot {
      * and direction.
      */
     private void updateBeams() {
-        double startAngle = direction - BEAM_SPREAD/2;
+        double startAngle = direction - BEAM_SPREAD / 2;
         double angleStep = BEAM_SPREAD / (NUM_BEAMS - 1);
 
         for (int i = 0; i < NUM_BEAMS; i++) {
@@ -62,7 +62,7 @@ public class BeamRobot extends Robot {
             int clearest = findClearestDirection();
             if (clearest != -1) {
                 // Turn towards the clearest direction
-                double targetAngle = direction - BEAM_SPREAD/2 +
+                double targetAngle = direction - BEAM_SPREAD / 2 +
                         (BEAM_SPREAD / (NUM_BEAMS - 1)) * clearest;
                 direction = targetAngle;
             } else {
@@ -78,6 +78,7 @@ public class BeamRobot extends Robot {
 
     /**
      * Finds the beam index with the clearest path (no obstacle detection)
+     *
      * @return index of clearest beam, or -1 if all beams detect obstacles
      */
     private int findClearestDirection() {
@@ -91,27 +92,29 @@ public class BeamRobot extends Robot {
 
     @Override
     public void draw(GraphicsContext gc) {
-        // Draw the base robot first
+        // Base robot
         super.draw(gc);
 
-        // Draw each beam
-        updateBeams();  // Ensure beams are in current position
+        // Draw beam sensors
         for (int i = 0; i < NUM_BEAMS; i++) {
             Line beam = beams.get(i);
+            boolean detected = beamDetections.get(i);
 
-            // Set color based on detection status
-            if (beamDetections.get(i)) {
-                gc.setStroke(Color.RED);  // Detected obstacle
-            } else {
-                gc.setStroke(Color.GREEN);  // Clear path
-            }
-
+            // Beam color based on detection
+            gc.setStroke(detected ? Color.RED : Color.LIME);
+            gc.setGlobalAlpha(0.6);
             gc.setLineWidth(2);
             gc.strokeLine(beam.getX1(), beam.getY1(), beam.getX2(), beam.getY2());
-        }
 
-        // Draw a small indicator showing this is a beam robot
+            // Beam endpoint indicator
+            double endX = beam.getX2();
+            double endY = beam.getY2();
+            gc.fillOval(endX - 3, endY - 3, 6, 6);
+        }
+        gc.setGlobalAlpha(1.0);
+
+        // Center sensor hub
         gc.setFill(Color.YELLOW);
-        gc.fillOval(x - radius/3, y - radius/3, radius/1.5, radius/1.5);
+        gc.fillOval(x - radius / 3, y - radius / 3, radius / 1.5, radius / 1.5);
     }
 }

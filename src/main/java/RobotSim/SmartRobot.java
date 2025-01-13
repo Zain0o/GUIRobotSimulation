@@ -209,23 +209,100 @@ public class SmartRobot extends Robot {
 
     /**
      * Draws the SmartRobot on the given GraphicsContext.
-     * It utilizes the inherited draw method and adds additional features.
+     * It utilizes enhanced visualization with separate components.
      *
      * @param gc The GraphicsContext used for drawing.
      */
     @Override
     public void draw(GraphicsContext gc) {
-        // Draw sensors and other SmartRobot-specific features
-        drawSensors(gc);
+        // Draw analysis effect
+        if (isAnalyzing) {
+            drawAnalysisEffect(gc);
+        }
 
-        // Draw robot body (overridden to change color based on analyzing state)
-        gc.setFill(isAnalyzing ? Color.PURPLE : Color.BLUE);
+        // Draw enhanced robot body with scanner effect
+        drawRobotBody(gc);
+
+        // Draw AI core
+        drawAICore(gc);
+
+        // Draw sensor array
+        drawSensorArray(gc);
+
+        // Draw status indicators
+        drawStatusIndicators(gc);
+    }
+
+    /**
+     * Draws the robot's body with a radial gradient.
+     *
+     * @param gc The GraphicsContext used for drawing.
+     */
+    private void drawRobotBody(GraphicsContext gc) {
+        RadialGradient bodyGradient = new RadialGradient(
+                0, 0, x, y, radius,
+                false, CycleMethod.NO_CYCLE,
+                new Stop(0, isAnalyzing ? Color.PURPLE : Color.BLUE),
+                new Stop(1, Color.DARKBLUE)
+        );
+        gc.setFill(bodyGradient);
         gc.fillOval(x - radius, y - radius, radius * 2, radius * 2);
+    }
 
-        // Draw "brain" core
-        gc.setFill(Color.YELLOW);
-        gc.fillOval(x - radius / 2, y - radius / 2, radius, radius);
+    /**
+     * Draws the AI core with a pulsating radial gradient.
+     *
+     * @param gc The GraphicsContext used for drawing.
+     */
+    private void drawAICore(GraphicsContext gc) {
+        double pulseSize = radius * 0.5 * (1 + 0.1 * Math.sin(System.currentTimeMillis() * 0.01));
+        RadialGradient coreGradient = new RadialGradient(
+                0, 0, x, y, pulseSize,
+                false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.YELLOW),
+                new Stop(1, Color.ORANGE)
+        );
+        gc.setFill(coreGradient);
+        gc.fillOval(x - pulseSize, y - pulseSize, pulseSize * 2, pulseSize * 2);
+    }
 
+    /**
+     * Draws the sensor array with sensor beams and nodes.
+     *
+     * @param gc The GraphicsContext used for drawing.
+     */
+    private void drawSensorArray(GraphicsContext gc) {
+        for (int i = 0; i < NUM_SENSORS; i++) {
+            double angle = i * (360.0 / NUM_SENSORS);
+            double sensorX = x + SENSOR_RANGE * Math.cos(Math.toRadians(angle));
+            double sensorY = y + SENSOR_RANGE * Math.sin(Math.toRadians(angle));
+
+            // Sensor beam
+            gc.setStroke(sensorReadings[i] > 0 ? Color.RED : Color.LIGHTBLUE);
+            gc.setGlobalAlpha(0.3);
+            gc.setLineWidth(2);
+            gc.strokeLine(x, y, sensorX, sensorY);
+
+            // Sensor node
+            double dangerLevel = collisionMemory[i][1];
+            Color nodeColor = Color.rgb(
+                    255,
+                    (int)(255 * (1 - dangerLevel)),
+                    0,
+                    0.7
+            );
+            gc.setFill(nodeColor);
+            gc.fillOval(sensorX - 5, sensorY - 5, 10, 10);
+        }
+        gc.setGlobalAlpha(1.0);
+    }
+
+    /**
+     * Draws status indicators such as direction and wheels.
+     *
+     * @param gc The GraphicsContext used for drawing.
+     */
+    private void drawStatusIndicators(GraphicsContext gc) {
         // Draw direction indicator
         gc.setStroke(Color.WHITE);
         gc.setLineWidth(2);
@@ -234,41 +311,8 @@ public class SmartRobot extends Robot {
                 x + radius * Math.cos(dirRads),
                 y + radius * Math.sin(dirRads));
 
-        // Draw analysis effect when analyzing
-        if (isAnalyzing) {
-            drawAnalysisEffect(gc);
-        }
-
         // Draw wheels inherited from Robot
         drawWheels(gc);
-    }
-
-    /**
-     * Draws sensor visualizations and indicators based on sensor readings and collision memory.
-     *
-     * @param gc The GraphicsContext used for drawing.
-     */
-    private void drawSensors(GraphicsContext gc) {
-        for (int i = 0; i < NUM_SENSORS; i++) {
-            double angle = i * (360.0 / NUM_SENSORS);
-            double sensorX = x + SENSOR_RANGE * Math.cos(Math.toRadians(angle));
-            double sensorY = y + SENSOR_RANGE * Math.sin(Math.toRadians(angle));
-
-            // Draw sensor line
-            gc.setStroke(sensorReadings[i] > 0 ? Color.RED : Color.LIGHTBLUE);
-            gc.setGlobalAlpha(0.3);
-            gc.setLineWidth(2);
-            gc.strokeLine(x, y, sensorX, sensorY);
-
-            // Draw danger level from memory
-            int memoryIndex = (int)(angle / 45) % 8;
-            double dangerLevel = collisionMemory[memoryIndex][1];
-            if (dangerLevel > 0) {
-                gc.setFill(Color.rgb(255, 0, 0, dangerLevel * 0.3));
-                gc.fillOval(sensorX - 5, sensorY - 5, 10, 10);
-            }
-        }
-        gc.setGlobalAlpha(1.0);
     }
 
     /**

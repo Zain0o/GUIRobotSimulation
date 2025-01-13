@@ -71,6 +71,8 @@ public class BumpRobot extends Robot {
                 y + radius * Math.sin(dirRads));
 
         drawBumpSensors(gc);
+
+        // Calls the newly renamed/protected method in Robot
         super.drawWheels(gc);
     }
 
@@ -92,9 +94,9 @@ public class BumpRobot extends Robot {
 
         for (int i = 0; i < 8; i++) {
             double angle = Math.toRadians(i * 45 + direction);
-            double sx = x + (radius - sensorSize/2) * Math.cos(angle);
-            double sy = y + (radius - sensorSize/2) * Math.sin(angle);
-            gc.fillOval(sx - sensorSize/2, sy - sensorSize/2, sensorSize, sensorSize);
+            double sx = x + (radius - sensorSize / 2) * Math.cos(angle);
+            double sy = y + (radius - sensorSize / 2) * Math.sin(angle);
+            gc.fillOval(sx - sensorSize / 2, sy - sensorSize / 2, sensorSize, sensorSize);
         }
     }
 
